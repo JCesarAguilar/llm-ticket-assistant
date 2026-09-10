@@ -13,6 +13,8 @@ def calculate_cost(prompt_tokens: int, completion_tokens: int) -> float:
 
 def log_metrics(row: dict) -> None:
     """Agrega una fila a metrics/metrics.csv, escribiendo el header si el archivo no existe o está vacío."""
+    config.METRICS_PATH.parent.mkdir(parents=True, exist_ok=True)
+
     file_exists = (
         config.METRICS_PATH.exists() and config.METRICS_PATH.stat().st_size > 0
     )
