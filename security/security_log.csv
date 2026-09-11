@@ -1,0 +1,3 @@
+trace_id,timestamp,stage,category,action,detail
+f67cc9ef06dc,2026-09-11T02:11:17.455534+00:00,post,prompt_leak,escalate,La respuesta contiene fragmentos literales del system prompt.
+fe373998b97b,2026-09-11T02:12:01.315202+00:00,pre,prompt_injection,escalate,Patrón sospechoso 'ignor\w*\s+(tus|las|todas)?\s*instruccion': ignora tus instrucciones
