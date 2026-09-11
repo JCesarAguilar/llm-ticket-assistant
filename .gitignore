@@ -24,3 +24,7 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Respaldos locales
+metrics/metrics_pre_bonus_backup.csv
+
