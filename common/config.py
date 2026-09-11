@@ -31,6 +31,7 @@ MAX_TOKENS = 300
 BASE_DIR = Path(__file__).resolve().parent.parent  # raíz del proyecto
 PROMPT_PATH = BASE_DIR / "prompts" / "main_prompt.txt"
 METRICS_PATH = BASE_DIR / "metrics" / "metrics.csv"
+SECURITY_LOG_PATH = BASE_DIR / "security" / "security_log.csv"
 
 INPUT_PRICE_1K = 0.00015  # Precio por cada 1,000 tokens para gpt-4o-mini
 OUTPUT_PRICE_1K = 0.0006  # Precio por cada 1,000 tokens para gpt-4o-mini
