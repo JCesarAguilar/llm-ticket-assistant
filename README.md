@@ -103,10 +103,13 @@ common/
   metrics.py       # cálculo de costo y registro de métricas en CSV
 src/
   run_query.py     # orquestación del flujo + punto de entrada ejecutable
+  safety.py        # chequeos de seguridad de entrada y salida, y logging de eventos
 prompts/
   main_prompt.txt  # prompt de sistema con instrucciones, reglas y ejemplos few-shot
 metrics/
   metrics.csv      # registro de métricas, una fila por ejecución
+security/
+  security_log.csv # eventos de seguridad, una fila por chequeo marcado
 tests/
   test_core.py     # tests automatizados
 pytest.ini         # configuración de pytest (rutas de importación)
@@ -150,6 +153,7 @@ Cada ejecución agrega una fila a `metrics/metrics.csv`:
 
 | Columna | Descripción |
 |---|---|
+| `trace_id` | Identificador de la consulta. Correlaciona esta fila con sus eventos en `security/security_log.csv`. |
 | `timestamp` | Fecha y hora de la consulta en UTC (formato ISO 8601). |
 | `tokens_prompt` | Tokens consumidos por el prompt enviado. |
 | `tokens_completion` | Tokens generados en la respuesta. |
@@ -174,6 +178,44 @@ estimated_cost_usd = (tokens_prompt / 1000) * INPUT_PRICE_1K
 Los precios por cada 1000 tokens están definidos en `common/config.py` y corresponden a
 las tarifas publicadas por OpenAI para `gpt-4o-mini`. Se calculan por separado porque los
 tokens de salida cuestan cuatro veces más que los de entrada.
+
+---
+
+## Seguridad (bonus)
+
+Cada consulta pasa por dos chequeos, implementados en `src/safety.py`:
+
+**Antes de llamar al modelo** (`check_input`) se modera la pregunta con la Moderation API de
+OpenAI y se la compara contra una lista de patrones de inyección de prompt. Si la moderación
+marca contenido dañino, la consulta se corta ahí: se devuelve una respuesta segura sin gastar
+la llamada al modelo. Si lo que se detecta es un intento de inyección, la consulta sigue —el
+modelo resiste bien este tipo de mensaje— pero queda marcada.
+
+**Después de tener la respuesta** (`check_output`) se modera el texto generado, se verifica que
+el modelo no esté repitiendo sus propias instrucciones, y se trata `confidence: 0.0` como señal
+de negativa.
+
+Cualquier consulta marcada por alguno de los dos chequeos recibe `escalar_a_humano` en sus
+acciones, sin importar lo que haya decidido el modelo, y genera una fila en
+`security/security_log.csv`:
+
+| Columna | Descripción |
+|---|---|
+| `trace_id` | Correlaciona el evento con su fila en `metrics/metrics.csv`. |
+| `timestamp` | Fecha y hora del evento en UTC. |
+| `stage` | `pre` (antes del modelo) o `post` (después). |
+| `category` | `harmful_content`, `prompt_injection`, `prompt_leak` o `model_refusal`. |
+| `action` | `block` (se cortó), `escalate` (siguió pero se marcó) o `allow`. |
+| `detail` | Qué lo disparó, con el texto truncado y la PII redactada. |
+
+El texto del usuario nunca se escribe crudo en el log: se trunca a 300 caracteres y se
+reemplazan los patrones de correo, tarjeta y documento antes de guardarlo.
+
+El detector de fuga de prompt deriva las frases que busca de la sección de instrucciones de
+`prompts/main_prompt.txt`, delimitada por el marcador `### EJEMPLOS ###`. Si se edita el prompt
+y se borra ese marcador, el módulo falla al importar en lugar de seguir funcionando mal. El
+razonamiento detrás de esa decisión, y el falso positivo que la motivó, están en la sección 5
+del reporte.
 
 ---
 
@@ -211,6 +253,8 @@ local (cálculo y validación).
    defecto del SDK de OpenAI; un fallo de red o de autenticación propaga la excepción.
 5. **Sin historial de conversación.** Cada consulta es independiente: el asistente no
    recuerda intercambios anteriores con el mismo cliente.
-6. **Sin moderación ni manejo de prompts adversariales.** El bonus de seguridad no está
-   implementado en esta versión.
+6. **Las defensas de seguridad son probabilísticas.** La lista de patrones de inyección se
+   puede esquivar reformulando, y la moderación usa la decisión binaria de OpenAI sin umbrales
+   propios por categoría. La única garantía dura es arquitectónica: el asistente no tiene
+   herramientas para actuar y nada llega al cliente sin revisión humana.
 7. **Probado en macOS con Python 3.14.** No se verificó el funcionamiento en Windows.
